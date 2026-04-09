@@ -1,151 +1,166 @@
-# AI News Aggregator
+# AI News Skill
 
-AI News Aggregator is a small backend service that fetches news from multiple external feeds, normalizes the data into a single model, filters it for AI-related content, removes duplicates, sorts by publication time, and exposes the result through a REST API.
+This project is a Claude Code / OpenCode skill for collecting and filtering AI news.
 
-The project is intentionally structured as a Clean Architecture MVP. The main goal is to keep business rules independent from frameworks and external providers, so the aggregation logic stays easy to test and easy to extend.
+The main goal is not just to expose an API. The main goal is to provide a callable skill, triggered by `/news` or an equivalent command, that:
+
+- fetches AI-related news from external sources
+- filters and normalizes the results
+- removes duplicates
+- returns the final payload directly into the agent context
+
+In other words, the core deliverable of this repository is `fetch_ai_news.py` and the supporting architecture around it.
+
+## What the Skill Does
+
+When the skill is invoked through `/news` or a similar command:
+
+1. The command runs `fetch_ai_news.py`
+2. `fetch_ai_news.py` executes the aggregation use case
+3. News is fetched from multiple configured sources
+4. Articles are normalized into one internal format
+5. Non-AI articles are filtered out
+6. Duplicate or near-duplicate articles are removed
+7. Articles are sorted by publication date
+8. The result is printed as JSON so the calling agent can place it directly into context
+
+This makes the skill useful for:
+
+- daily AI news summaries
+- agent workflows that need fresh AI-related context
+- automation tasks inside Claude Code / OpenCode
+- terminal-based debugging of news collection logic
+
+## Why `fetch_ai_news.py` Is the Main Piece
+
+`fetch_ai_news.py` is the operational entrypoint of the skill.
+
+Its job is to run the entire news pipeline and output the final result in a machine-friendly format. It is intentionally small because it should not contain duplicated business logic. Instead, it reuses the same internal layers that power the rest of the project.
+
+`fetch_ai_news.py` is responsible for:
+
+- bootstrapping the container
+- creating the main use case
+- executing the AI news aggregation workflow
+- serializing the result into JSON
+- printing the payload to stdout for the calling agent
+
+`fetch_ai_news.py` is not responsible for:
+
+- raw RSS parsing logic
+- filtering rules
+- deduplication logic
+- source-specific fetching details
+
+Those responsibilities live in the inner layers so the entrypoint stays thin and stable.
 
 ## Quick Overview of Clean Architecture
 
-Clean Architecture separates the system into layers with clear responsibilities. The inner layers contain business rules. The outer layers contain technical details like HTTP, RSS parsing, and FastAPI.
+The codebase uses Clean Architecture so the skill logic stays modular and easy to extend.
 
-The dependency direction always points inward:
+The dependency direction points inward:
 
-- Interface layer depends on application layer
-- Infrastructure layer depends on domain and application layer contracts
-- Application layer depends on domain layer
-- Domain layer depends on nothing external
+- interface layer depends on application layer
+- infrastructure layer depends on domain and application contracts
+- application layer depends on domain layer
+- domain layer depends on nothing external
 
-That means the core news logic does not need to know whether articles came from RSS, a public API, or a mock provider, and it does not need to know whether results are returned through FastAPI, a CLI command, or a background job.
+This matters because the core news logic should not care whether it is triggered by:
+
+- a Claude Code command
+- an OpenCode command
+- a FastAPI endpoint
+- a future scheduled job
+
+The business behavior should stay the same regardless of how the skill is invoked.
 
 ## Layers in This Project
 
 ### Domain layer
 
-The domain layer defines the business vocabulary and business rules.
+The domain layer contains the business concepts and rules.
 
 - `app/domain/entities.py`
-  Defines the `Article` entity, which is the normalized representation used throughout the system.
+  Defines the normalized `Article` entity.
 - `app/domain/interfaces.py`
-  Defines the `NewsSource` contract. Any external provider must implement this interface.
+  Defines the `NewsSource` abstraction for external providers.
 - `app/domain/services.py`
-  Contains pure business logic:
-  filtering articles by AI-related keywords and deduplicating similar articles.
+  Contains AI keyword filtering and deduplication rules.
 
-What belongs here:
-
-- Article model
-- Relevance rules
-- Deduplication rules
-
-What does not belong here:
-
-- FastAPI code
-- HTTP requests
-- RSS parsing
-- Environment variable loading
+This layer knows nothing about commands, FastAPI, RSS XML, or environment variables.
 
 ### Application layer
 
-The application layer coordinates the domain rules to deliver a concrete use case.
+The application layer coordinates the business workflow.
 
 - `app/application/dto.py`
-  Defines request and response DTOs used by the use case.
+  Defines use-case input and output DTOs.
 - `app/application/use_cases.py`
-  Implements `GetNewsUseCase`, the core orchestration flow of the system.
+  Implements `GetNewsUseCase`.
 
-Responsibilities of the application layer:
+This is where the main orchestration happens:
 
-- Fetch from multiple sources in parallel
-- Collect partial failures without failing the whole request
-- Apply domain filtering
-- Apply deduplication
-- Sort results
-- Enforce the requested result limit
-
-This layer should read like a business workflow, not like framework glue.
+- fetch from sources concurrently
+- tolerate partial failures
+- filter results
+- deduplicate results
+- sort results
+- enforce the requested limit
 
 ### Infrastructure layer
 
-The infrastructure layer contains concrete adapters for the outside world.
+The infrastructure layer contains concrete technical adapters.
 
 - `app/infrastructure/http.py`
-  Standard-library HTTP client adapter.
+  HTTP client implementation using the Python standard library.
 - `app/infrastructure/rss_parser.py`
-  Parses RSS and Atom XML and turns them into normalized `Article` entities.
+  RSS and Atom parsing plus normalization into domain articles.
 - `app/infrastructure/news_sources.py`
-  Concrete `NewsSource` implementation for RSS feeds.
+  Concrete source adapter implementing `NewsSource`.
 - `app/infrastructure/config.py`
-  Loads runtime configuration such as source URLs and timeouts.
+  Runtime configuration loading.
 - `app/infrastructure/logging.py`
-  Configures application logging.
+  Logging setup.
 - `app/infrastructure/container.py`
-  Wires implementations together and builds the use case.
+  Wires the concrete pieces together.
 
-This is the layer most likely to change when you swap technologies or external providers.
+This is the layer you extend when you add a new provider.
 
 ### Interface layer
 
-The interface layer exposes the use case to clients.
+The interface layer exposes the system to callers.
 
 - `app/interface/api/app.py`
-  Builds the FastAPI app.
+  FastAPI app setup.
 - `app/interface/api/routes.py`
-  Exposes `GET /news`.
+  `GET /news` endpoint.
 - `app/interface/api/schemas.py`
-  Defines request and response API shapes.
+  API response models.
 - `app/interface/api/dependencies.py`
-  Provides dependency wiring for FastAPI.
+  Dependency wiring for FastAPI.
 
-This layer should stay thin. It translates HTTP input into a use-case call and then maps the use-case result into an HTTP response.
+For the skill use case, the CLI command path is the primary interface. The API is a secondary interface that reuses the same core logic.
 
 ## Overall Pipeline
 
-The end-to-end pipeline for `GET /news` looks like this:
+The core pipeline of the skill is:
 
-1. A client calls `GET /news` with optional `q`, `source`, and `limit` query parameters.
-2. The FastAPI route creates a `NewsQuery` object and calls `GetNewsUseCase`.
-3. The use case asks all configured `NewsSource` implementations to fetch articles in parallel.
-4. Each source uses the infrastructure HTTP client with a timeout to fetch its feed.
-5. RSS or Atom payloads are parsed and normalized into domain `Article` objects.
-6. The use case applies AI-related filtering on title plus description.
-7. The use case applies optional user filters such as `q` and `source`.
-8. Duplicate or near-duplicate articles are removed.
-9. Remaining articles are sorted by `published_at` in descending order.
-10. The API returns the final list and includes any per-source errors as partial-failure metadata.
+`command -> fetch_ai_news.py -> container -> GetNewsUseCase -> news sources -> parser -> filter -> dedupe -> sort -> JSON output -> agent context`
 
-In short:
+Step by step:
 
-`external feeds -> infrastructure adapters -> normalized Article objects -> use case -> API response`
-
-## Why `fetch_ai_news.py` Exists
-
-`fetch_ai_news.py` is the CLI entrypoint for the same aggregation pipeline used by the API.
-
-Its purpose is to provide a lightweight way to run the aggregator without starting FastAPI. That makes it useful for:
-
-- local smoke testing
-- terminal-based inspection of fetched articles
-- automation hooks
-- debugging source configuration
-
-Instead of reimplementing any news logic, `fetch_ai_news.py` reuses the same application and infrastructure wiring as the REST API. This is important because it keeps behavior consistent across entrypoints.
-
-What `fetch_ai_news.py` does:
-
-1. Builds the dependency container
-2. Creates the `GetNewsUseCase`
-3. Executes the use case with a default limit of 10
-4. Converts the result DTOs into JSON-friendly dictionaries
-5. Prints the aggregated payload to stdout
-
-What `fetch_ai_news.py` does not do:
-
-- It does not fetch RSS directly by itself
-- It does not contain business filtering logic
-- It does not deduplicate articles by itself
-- It does not bypass the architecture
-
-That design keeps the CLI adapter very small and makes it a good example of how additional interfaces should be added in the future.
+1. A command such as `/news` invokes the skill script
+2. The script runs `fetch_ai_news.py`
+3. `fetch_ai_news.py` builds the dependency container
+4. The container creates `GetNewsUseCase`
+5. The use case fetches articles from all configured sources in parallel
+6. Each source adapter downloads and parses feed data with a timeout
+7. Parsed items are normalized into `Article`
+8. AI-related filtering is applied to title and description
+9. Duplicate content is removed
+10. Articles are sorted by `published_at` descending
+11. The final payload is serialized to JSON
+12. The calling agent receives the output directly in its context
 
 ## Project Structure
 
@@ -178,7 +193,60 @@ That design keeps the CLI adapter very small and makes it a good example of how 
 └── requirements.txt
 ```
 
+## How to Run the Skill Logic
+
+Run the main skill entrypoint directly:
+
+```bash
+python fetch_ai_news.py
+```
+
+This prints JSON to stdout, which is exactly what a calling agent or wrapper command can consume.
+
+## How to Run from OpenCode
+
+This repository is designed to work well with OpenCode as a callable skill.
+
+The intended flow is:
+
+1. Open the project in OpenCode
+2. Invoke the news command from the OpenCode command palette or slash-command flow
+3. OpenCode runs the configured wrapper command
+4. The wrapper command executes `fetch_ai_news.py`
+5. The JSON result is returned into the agent context
+
+In this repository, the wrapper command is:
+
+```bash
+.claude/commands/news.sh
+```
+
+That script changes into the project root and runs:
+
+```bash
+python3 fetch_ai_news.py
+```
+
+Typical local flow:
+
+```bash
+cd path-to/ai-news-skill
+opencode
+```
+
+Then invoke the skill as `/news` or through the equivalent command picker configured in your OpenCode setup.
+
+If you want to test the exact same logic outside OpenCode, run:
+
+```bash
+python fetch_ai_news.py
+```
+
+That is useful because OpenCode and the direct CLI path share the same underlying aggregation pipeline.
+
 ## API
+
+The repository also includes a FastAPI interface that reuses the same core logic.
 
 ### `GET /news`
 
@@ -186,32 +254,15 @@ Query params:
 
 - `q`: optional free-text filter applied to title and description
 - `source`: optional exact source filter
-- `limit`: optional result limit, bounded by configured max
+- `limit`: optional result limit
 
 Example:
 
 ```bash
-curl "http://127.0.0.1:8000/news?source=Google%20News&limit=5"
+curl "http://127.0.0.1:8000/news?limit=5"
 ```
 
-Response shape:
-
-```json
-{
-  "items": [
-    {
-      "id": "65949220d940c779",
-      "title": "Claude, OpenClaw and the new reality: AI agents are here — and so is the chaos - VentureBeat",
-      "description": "Claude, OpenClaw and the new reality: AI agents are here — and so is the chaos VentureBeat",
-      "url": "https://news.google.com/...",
-      "source": "VentureBeat AI",
-      "published_at": "2026-04-09T04:51:37+00:00"
-    }
-  ],
-  "count": 1,
-  "errors": []
-}
-```
+The API is useful for development and external integrations, but the skill-oriented CLI flow remains the primary use case of this project.
 
 ## Configuration
 
@@ -222,7 +273,7 @@ Environment variables:
 - `NEWS_DEFAULT_LIMIT`
   Default limit when `limit` is not provided
 - `NEWS_MAX_LIMIT`
-  Maximum allowed limit for the API
+  Maximum allowed limit
 - `NEWS_SOURCES`
   JSON array of source objects with `name` and `url`
 
@@ -236,37 +287,32 @@ export NEWS_SOURCES='[
 ]'
 ```
 
-## Running the Project
+## Running the Full Project
 
-1. Create or activate a virtual environment.
+1. Create or activate a virtual environment
 2. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Start the API:
-
-```bash
-uvicorn main:app --reload
-```
-
-4. Query the API:
-
-```bash
-curl "http://127.0.0.1:8000/news?limit=5"
-```
-
-5. Or run the CLI adapter:
+3. Run the skill entrypoint:
 
 ```bash
 python fetch_ai_news.py
 ```
 
-## Notes and Edge Cases
+4. Optionally start the API:
 
-- If one external source fails, the service still returns results from the other sources.
-- Empty or malformed feed items are skipped during normalization.
-- Duplicate articles are removed using URL equality and title similarity.
-- Source requests are executed concurrently.
-- If no articles match after filtering, the API returns an empty `items` list rather than an error.
+```bash
+uvicorn main:app --reload
+```
+
+## Notes
+
+- Partial source failures do not break the whole result
+- Empty or malformed feed items are skipped
+- Duplicate content is removed by URL and title similarity
+- Requests to external sources use timeouts
+- Source fetching runs concurrently
+- If nothing matches, the output remains valid and returns an empty list
