@@ -11,6 +11,8 @@ from app.infrastructure.rss_parser import parse_rss_articles
 
 
 class RssNewsSource(NewsSource):
+    """Concrete news source adapter backed by an RSS or Atom feed."""
+
     def __init__(
         self,
         source_name: str,
@@ -34,5 +36,6 @@ class RssNewsSource(NewsSource):
             payload = self._http_client.get(self._url, timeout=self._timeout_seconds)
             return parse_rss_articles(payload, self._source_name)
         except (urllib.error.URLError, TimeoutError, ET.ParseError, ValueError) as exc:
+            # Raise a stable application-facing error while preserving details in logs.
             self._logger.error("Source fetch failed for %s: %s", self._source_name, exc)
             raise RuntimeError(f"source fetch failed: {exc}") from exc

@@ -9,6 +9,8 @@ from app.infrastructure.news_sources import RssNewsSource
 
 
 class Container:
+    """Composes infrastructure implementations for the application layer."""
+
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or load_settings()
         self.logger = configure_logging()

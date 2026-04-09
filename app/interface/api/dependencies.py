@@ -8,6 +8,7 @@ from app.infrastructure.container import Container
 
 @lru_cache(maxsize=1)
 def get_container() -> Container:
+    """Reuse a single container instance across requests."""
     return Container()
 
 

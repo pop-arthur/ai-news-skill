@@ -10,6 +10,8 @@ from app.domain.services import ArticleDeduplicator, ArticleFilter
 
 
 class GetNewsUseCase:
+    """Coordinates aggregation, filtering, deduplication, and sorting."""
+
     def __init__(
         self,
         sources: list[NewsSource],
@@ -23,6 +25,7 @@ class GetNewsUseCase:
         self._logger = logger
 
     def execute(self, query: NewsQuery) -> NewsResult:
+        """Return news items for the given query while tolerating source failures."""
         raw_articles, errors = self._fetch_from_sources()
 
         filtered_articles = [
@@ -59,6 +62,7 @@ class GetNewsUseCase:
                 try:
                     articles.extend(future.result())
                 except Exception as exc:
+                    # Source failures are isolated so the API can still return partial data.
                     self._logger.exception("Failed to fetch source %s", source_name)
                     errors.append(SourceError(source=source_name, message=str(exc)))
 

@@ -22,6 +22,7 @@ def get_news(
     limit: int | None = Query(default=None, ge=0),
     use_case: GetNewsUseCase = Depends(get_news_use_case),
 ) -> NewsResponse:
+    """Expose aggregated AI news through a thin HTTP endpoint."""
     settings = get_container().settings
     effective_limit = settings.default_limit if limit is None else min(limit, settings.max_limit)
     result = use_case.execute(NewsQuery(q=q, source=source, limit=effective_limit))

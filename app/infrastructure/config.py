@@ -44,6 +44,7 @@ DEFAULT_SOURCES = (
 
 
 def load_settings() -> Settings:
+    """Load runtime configuration from environment variables."""
     timeout = float(os.getenv("NEWS_REQUEST_TIMEOUT_SECONDS", "10"))
     default_limit = int(os.getenv("NEWS_DEFAULT_LIMIT", "20"))
     max_limit = int(os.getenv("NEWS_MAX_LIMIT", "100"))

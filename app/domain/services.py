@@ -30,6 +30,8 @@ AI_KEYWORDS = (
 
 
 class ArticleFilter:
+    """Encapsulates article relevance and user-supplied filtering rules."""
+
     def __init__(self, keywords: tuple[str, ...] = AI_KEYWORDS) -> None:
         self._keywords = tuple(keyword.casefold() for keyword in keywords)
 
@@ -51,6 +53,8 @@ class ArticleFilter:
 
 
 class ArticleDeduplicator:
+    """Removes obvious duplicates using URL equality and title similarity."""
+
     def __init__(self, similarity_threshold: float = 0.92) -> None:
         self._similarity_threshold = similarity_threshold
 

@@ -13,6 +13,7 @@ from app.domain.entities import Article
 
 
 def parse_rss_articles(payload: bytes, source_name: str) -> list[Article]:
+    """Parse RSS or Atom XML into normalized domain articles."""
     root = ET.fromstring(payload)
     entries = root.findall(".//item")
     if not entries:
@@ -76,6 +77,7 @@ def _find_text(element: ET.Element, names: Iterable[str]) -> str:
 
 
 def _extract_link(element: ET.Element) -> str:
+    """Handle both RSS text links and Atom link href attributes."""
     direct = _find_text(element, ["link", "{http://www.w3.org/2005/Atom}id"])
     if direct and direct.startswith("http"):
         return direct
@@ -105,6 +107,7 @@ def _parse_date(value: str | None) -> datetime:
 
 
 def _clean_text(value: str) -> str:
+    """Strip feed markup so normalized descriptions stay API-friendly."""
     without_tags = re.sub(r"<[^>]+>", " ", value)
     unescaped = html.unescape(without_tags)
     return " ".join(unescaped.split())

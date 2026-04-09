@@ -5,11 +5,15 @@ from typing import Protocol
 
 
 class HttpClient(Protocol):
+    """Port for retrieving remote content."""
+
     def get(self, url: str, timeout: float) -> bytes:
         ...
 
 
 class UrllibHttpClient:
+    """Standard-library HTTP client used by infrastructure adapters."""
+
     def __init__(self, user_agent: str = "ai-news-aggregator/1.0") -> None:
         self._user_agent = user_agent
 
