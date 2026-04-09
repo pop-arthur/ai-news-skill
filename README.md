@@ -11,6 +11,10 @@ The main goal is not just to expose an API. The main goal is to provide a callab
 
 In other words, the core deliverable of this repository is `fetch_ai_news.py` and the supporting architecture around it.
 
+## Demo
+
+[demo.mp4](demo.mp4)
+
 ## What the Skill Does
 
 When the skill is invoked through `/news` or a similar command:
