@@ -31,28 +31,70 @@ This makes the skill useful for:
 - automation tasks inside Claude Code / OpenCode
 - terminal-based debugging of news collection logic
 
-## Why `fetch_ai_news.py` Is the Main Piece
+## How to Run from OpenCode
 
-`fetch_ai_news.py` is the operational entrypoint of the skill.
+This repository is designed to work well with OpenCode as a callable skill.
 
-Its job is to run the entire news pipeline and output the final result in a machine-friendly format. It is intentionally small because it should not contain duplicated business logic. Instead, it reuses the same internal layers that power the rest of the project.
+The intended flow is:
 
-`fetch_ai_news.py` is responsible for:
+1. Open the project in OpenCode
+2. Invoke the news command from the OpenCode command palette or slash-command flow
+3. OpenCode runs the configured wrapper command
+4. The wrapper command executes `fetch_ai_news.py`
+5. The JSON result is returned into the agent context
 
-- bootstrapping the container
-- creating the main use case
-- executing the AI news aggregation workflow
-- serializing the result into JSON
-- printing the payload to stdout for the calling agent
+In this repository, the wrapper command is:
 
-`fetch_ai_news.py` is not responsible for:
+```bash
+.agents/commands/news.sh
+```
 
-- raw RSS parsing logic
-- filtering rules
-- deduplication logic
-- source-specific fetching details
+That script changes into the project root and runs:
 
-Those responsibilities live in the inner layers so the entrypoint stays thin and stable.
+```bash
+python3 fetch_ai_news.py
+```
+
+Typical local flow:
+
+```bash
+cd path-to/ai-news-skill
+opencode
+```
+
+Then invoke the skill through the question on "AI news"
+
+
+## Project Structure
+
+```text
+.
+├── app
+│   ├── application
+│   │   ├── dto.py
+│   │   └── use_cases.py
+│   ├── domain
+│   │   ├── entities.py
+│   │   ├── interfaces.py
+│   │   └── services.py
+│   ├── infrastructure
+│   │   ├── config.py
+│   │   ├── container.py
+│   │   ├── http.py
+│   │   ├── logging.py
+│   │   ├── news_sources.py
+│   │   └── rss_parser.py
+│   └── interface
+│       └── api
+│           ├── app.py
+│           ├── dependencies.py
+│           ├── routes.py
+│           └── schemas.py
+├── fetch_ai_news.py
+├── main.py
+├── README.md
+└── requirements.txt
+```
 
 ## Quick Overview of Clean Architecture
 
@@ -162,36 +204,6 @@ Step by step:
 11. The final payload is serialized to JSON
 12. The calling agent receives the output directly in its context
 
-## Project Structure
-
-```text
-.
-├── app
-│   ├── application
-│   │   ├── dto.py
-│   │   └── use_cases.py
-│   ├── domain
-│   │   ├── entities.py
-│   │   ├── interfaces.py
-│   │   └── services.py
-│   ├── infrastructure
-│   │   ├── config.py
-│   │   ├── container.py
-│   │   ├── http.py
-│   │   ├── logging.py
-│   │   ├── news_sources.py
-│   │   └── rss_parser.py
-│   └── interface
-│       └── api
-│           ├── app.py
-│           ├── dependencies.py
-│           ├── routes.py
-│           └── schemas.py
-├── fetch_ai_news.py
-├── main.py
-├── README.md
-└── requirements.txt
-```
 
 ## How to Run the Skill Logic
 
@@ -202,47 +214,6 @@ python fetch_ai_news.py
 ```
 
 This prints JSON to stdout, which is exactly what a calling agent or wrapper command can consume.
-
-## How to Run from OpenCode
-
-This repository is designed to work well with OpenCode as a callable skill.
-
-The intended flow is:
-
-1. Open the project in OpenCode
-2. Invoke the news command from the OpenCode command palette or slash-command flow
-3. OpenCode runs the configured wrapper command
-4. The wrapper command executes `fetch_ai_news.py`
-5. The JSON result is returned into the agent context
-
-In this repository, the wrapper command is:
-
-```bash
-.claude/commands/news.sh
-```
-
-That script changes into the project root and runs:
-
-```bash
-python3 fetch_ai_news.py
-```
-
-Typical local flow:
-
-```bash
-cd path-to/ai-news-skill
-opencode
-```
-
-Then invoke the skill as `/news` or through the equivalent command picker configured in your OpenCode setup.
-
-If you want to test the exact same logic outside OpenCode, run:
-
-```bash
-python fetch_ai_news.py
-```
-
-That is useful because OpenCode and the direct CLI path share the same underlying aggregation pipeline.
 
 ## API
 
@@ -307,12 +278,3 @@ python fetch_ai_news.py
 ```bash
 uvicorn main:app --reload
 ```
-
-## Notes
-
-- Partial source failures do not break the whole result
-- Empty or malformed feed items are skipped
-- Duplicate content is removed by URL and title similarity
-- Requests to external sources use timeouts
-- Source fetching runs concurrently
-- If nothing matches, the output remains valid and returns an empty list

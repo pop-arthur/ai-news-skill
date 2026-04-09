@@ -12,7 +12,6 @@ Use this skill to fetch and summarize the latest AI news.
 When the user asks for AI news, call the `news` command:
 
 ```bash
-/Users/arthur/PycharmProjects/ai-news-skill/.claude/commands/news.sh
+.agents/commands/news.sh
 ```
-
 Return the output directly to the user in the dialog.
